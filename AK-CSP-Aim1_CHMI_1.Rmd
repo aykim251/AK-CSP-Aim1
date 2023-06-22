@@ -86,21 +86,16 @@ col_NF54_D29 <- grep("D29", names(df_NF54), value = TRUE) # All column headers w
 col_7G8_D29 <- grep("D29", names(df_7G8), value = TRUE) # All column headers w/ "D29" w/in df_7G8
 ```
 
-Sub-data frames -- NF54 and 7G8 CHMI -- parsed by Day1 or Day29 sera
+Sub-data frames (w/ Log2 transform) -- NF54 and 7G8 CHMI -- parsed by Day1 or Day29 sera 
 ```{r}
 # NF54 - parsed by Day1, Day29 sera
-df_NF54_D1 <- cbind(LEFT_CSP, df_NF54[, col_NF54_D1])
-df_NF54_D29 <- cbind(LEFT_CSP, df_NF54[, col_NF54_D29])
+df_NF54_D1 <- cbind(LEFT_CSP, log(df_NF54[, col_NF54_D1], 2))
+df_NF54_D29 <- cbind(LEFT_CSP, log(df_NF54[, col_NF54_D29], 2))
 
 # 7G8 - parsed by Day1, Day29 sera
-df_7G8_D1 <- cbind(LEFT_CSP, df_7G8[, col_7G8_D1])
-df_7G8_D29 <- cbind(LEFT_CSP, df_7G8[, col_7G8_D29])
+df_7G8_D1 <- cbind(LEFT_CSP, log(df_7G8[, col_7G8_D1], 2))
+df_7G8_D29 <- cbind(LEFT_CSP, log(df_7G8[, col_7G8_D29], 2))
 #print(df_NF54_D1)
-```
-
-Log_2
-```{r}
-
 ```
 
 Take the average and standard deviation of 7G8 AB's (DAY 29)
@@ -113,6 +108,12 @@ std_df_7G8_D29 <- apply(df_7G8_D29[,col_7G8_D29], 1, sd, na.rm = TRUE)
 
 # Calculate median for using apply()
 median_df_7G8_D29 <- apply(df_7G8_D29[,col_7G8_D29], 1, median, na.rm = TRUE)
+
+
+# Obtain median COLUMN for using apply()
+TestMedian_df_7G8_D29_values <- apply(df_7G8_D29[,col_7G8_D29], 2, median, na.rm = TRUE)
+TestMedian_df_7G8_D29 <- names(df_7G8_D29[,col_7G8_D29])[which(TestMedian_df_7G8_D29_values == median(TestMedian_df_7G8_D29_values))]
+
 ```
 
 ```{r}
@@ -140,12 +141,33 @@ Boxplot by position, no label
 # Per 'Adjusted.Position'
 df_7G8_D29_box <- melt(df_7G8_D29[,c(4, 5:ncol(df_7G8_D29))], id.vars = "Adjusted.Position")
 plot7G8_D29_BP <- ggplot(df_7G8_D29_box, aes(group = Adjusted.Position, y = value)) + 
-  geom_boxplot(color="red") + 
+  geom_boxplot(color="red", alpha=0.5) + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
   ggtitle("7G8_Day29")
 plot7G8_D29_BP
 ```
+Lineplot by position, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_7G8_D29_box <- melt(df_7G8_D29[,c(4, 5:ncol(df_7G8_D29))], id.vars = "Adjusted.Position")
+plot7G8_D29_BP <- ggplot(df_7G8_D29_box, aes(x = Adjusted.Position, y = value)) + 
+  geom_line(color="red") + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8_Day29")
+plot7G8_D29_BP
+```
+MEDIAN Lineplot by position, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_7G8_D29_box <- melt(df_7G8_D29[,c(4, which(colnames(df_7G8_D29)==TestMedian_df_7G8_D29))], id.vars = "Adjusted.Position")
 
+
+plot7G8_D29_BP <- ggplot(df_7G8_D29_box, aes(x = Adjusted.Position, y = value)) + 
+  geom_line(color="red") + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8_Day29")
+plot7G8_D29_BP
+```
 
 ```{r}
 # Manually removing "outliers" > 10000 FI
@@ -218,7 +240,7 @@ mean_7G8_D1 <- rowMeans(df_7G8_D1[,col_7G8_D1], na.rm = TRUE)
 std_df_7G8_D1 <- apply(df_7G8_D1[,col_7G8_D1], 1, sd, na.rm = TRUE)
 
 # Calculate median for using apply()
-median_df_7G8_D29 <- apply(df_7G8_D1[,col_7G8_D1], 1, median, na.rm = TRUE)
+median_df_7G8_D21 <- apply(df_7G8_D1[,col_7G8_D1], 1, median, na.rm = TRUE)
 ```
 
 ```{r}
