@@ -1,0 +1,343 @@
+---
+title: "AK-CSP-Aim1-7G8"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+install.packages("ggpubr")
+```
+
+
+```{r}
+
+#install.packages('stringdist')
+
+library(dplyr)
+library(reshape2)
+#library(magrittr)
+#library(reshape)
+library(ggplot2)
+#library(colorRamps)
+#library(gplots)
+library(RColorBrewer)
+library(viridis)
+#library(readr)
+library(tidyverse)
+library(ggpubr)
+
+# Allows for user interaction with RStudio IDE
+library(rstudioapi)
+```
+```{r}
+setwd("/Users/akim/Documents/R-AK/AK-CSP-Aim1/")
+print(getwd())
+```
+
+```{r}
+CSP_matrix = read.csv(file.path(getwd(),"/03_input/original/smoothedintensities_IGS_2016_7G8_ref_PF3D7_0304600.csv"))
+
+### Create Output Folder by Variant Name ###
+Pf_CSP_var <- "7G8"
+```
+
+
+Goal for Modular: Collate matrix by similarities in column names (NF54 or 7G8)
+```{r}
+# Selects first 4 columns of the data frame (constant for all .csv files)
+LEFT_CSP <- select(CSP_matrix, Isolate, Amino.acid, Original.Position, Adjusted.Position) 
+#similar_header_pattern <- "^(\\w+)_\\d+$"
+unique_headers <- unique(gsub(similar_header_pattern, "\\3", names(CSP_matrix)))
+col_NF54 <- grep("NF54", names(CSP_matrix), value = TRUE) # All column headers w/ "NF54"
+col_7G8 <- grep("7G8", names(CSP_matrix), value = TRUE) # All column headers w/ "7G8"
+```
+
+Sub-data frames -- all NF54 CHMI AB's
+```{r}
+df_NF54 <- cbind(LEFT_CSP, CSP_matrix[, col_NF54])
+#print(new_df_NF54)
+```
+
+Sub-data frames -- all 7G8 CHMI AB's
+```{r}
+df_7G8 <- cbind(LEFT_CSP, CSP_matrix[, col_7G8])
+#print(new_df_7G8)
+```
+
+
+```{r}
+# Day 1
+col_NF54_D1 <- grep("D1", names(df_NF54), value = TRUE) # All column headers w/ "D1" w/in df_NF54
+col_7G8_D1 <- grep("D1", names(df_7G8), value = TRUE) # All column headers w/ "D1" w/in df_7G8
+
+# Day 29
+col_NF54_D29 <- grep("D29", names(df_NF54), value = TRUE) # All column headers w/ "D29" w/in df_NF54
+col_7G8_D29 <- grep("D29", names(df_7G8), value = TRUE) # All column headers w/ "D29" w/in df_7G8
+```
+
+Sub-data frames -- NF54 and 7G8 CHMI -- parsed by Day1 or Day29 sera
+```{r}
+# NF54 - parsed by Day1, Day29 sera
+df_NF54_D1 <- cbind(LEFT_CSP, df_NF54[, col_NF54_D1])
+df_NF54_D29 <- cbind(LEFT_CSP, df_NF54[, col_NF54_D29])
+
+# 7G8 - parsed by Day1, Day29 sera
+df_7G8_D1 <- cbind(LEFT_CSP, df_7G8[, col_7G8_D1])
+df_7G8_D29 <- cbind(LEFT_CSP, df_7G8[, col_7G8_D29])
+#print(df_NF54_D1)
+```
+
+Take the average and standard deviation of 7G8 AB's (DAY 29)
+```{r}
+# Returns value mean (of 7G8 -- Day29), as a column
+mean_7G8_D29 <- rowMeans(df_7G8_D29[,col_7G8_D29], na.rm = TRUE)
+
+# Calculate stddevs using apply()
+std_df_7G8_D29 <- apply(df_7G8_D29[,col_7G8_D29], 1, sd, na.rm = TRUE)
+
+# Calculate median for using apply()
+median_df_7G8_D29 <- apply(df_7G8_D29[,col_7G8_D29], 1, median, na.rm = TRUE)
+```
+
+```{r}
+# Appends mean values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$row_means <- mean_7G8_D29
+
+# Appends mean values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$row_median <- median_df_7G8_D29
+
+# Appends std_dev values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$SD <- std_df_7G8_D29
+
+```
+
+Find the serorecognition threshold
+```{r}
+df_7G8_D29_meanstdevthresh <- df_7G8_D29 %>% 
+    mutate("row_means" = mean_7G8_D29) %>% mutate("SD" = std_df_7G8_D29) %>%
+  mutate("2.5stdev" = 2.5*SD) %>% mutate("threshold" = row_means + 2.5*SD)
+# At baseline - taking rowmeans of Day1 data ()
+```
+
+
+Boxplot by position, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_7G8_D29_box <- melt(df_7G8_D29[,c(4, 5:ncol(df_7G8_D29))], id.vars = "Adjusted.Position")
+plot7G8_D29_BP <- ggplot(df_7G8_D29_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot(color="red") + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8_Day29")
+plot7G8_D29_BP
+```
+
+
+```{r}
+# Manually removing "outliers" > 10000 FI
+
+EDIT_df_7G8_D29 <- df_7G8_D29 %>% select(
+    -M20UMD059_D29_7G8, # >10000 FI
+    -M20UMD024_D29_7G8, # >10000 FI
+    -M20UMD053_D29_7G8, # >10000 FI
+    -M20UMD045_D29_7G8, # >10000 FI
+    -M20UMD049_D29_7G8, # >10000 FI
+    -M20UMD011_D29_7G8, # >10000 FI
+    -M20UMD014_D29_7G8, # >10000 FI
+    
+        )
+```
+
+
+EDIT_Boxplot by position, no label
+```{r}
+
+# Per 'Adjusted.Position'
+EDIT_df_7G8_D29_box <- melt(EDIT_df_7G8_D29[,c(4, 5:ncol(EDIT_df_7G8_D29))], id.vars = "Adjusted.Position")
+ggplot(EDIT_df_7G8_D29_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8_Day29")
+```
+
+
+
+```{r}
+# Manually removing "outliers" > 10000 FI
+
+EDIT_df_7G8_D29 <- df_7G8_D29 %>% select(
+    -M20UMD059_D29_7G8, # >10000 FI
+    -M20UMD024_D29_7G8, # >10000 FI
+    -M20UMD053_D29_7G8, # >10000 FI
+    -M20UMD045_D29_7G8, # >10000 FI
+    -M20UMD049_D29_7G8, # >10000 FI
+    -M20UMD011_D29_7G8, # >10000 FI
+    -M20UMD014_D29_7G8, # >10000 FI
+    -M20UMD042_D29_7G8, # >5000
+    -M20UMD038_D29_7G8, # >10000 (AA: ~350)
+    -M20UMD044_D29_7G8, # >2000
+    -M20UMD050_D29_7G8 # >10000 (AA: ~120)
+    
+        )
+```
+
+
+EDIT_Boxplot by position, no label
+```{r}
+
+# Per 'Adjusted.Position'
+EDIT_df_7G8_D29_box <- melt(EDIT_df_7G8_D29[,c(4, 5:ncol(EDIT_df_7G8_D29))], id.vars = "Adjusted.Position")
+ggplot(EDIT_df_7G8_D29_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot() + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8_Day29")
+```
+
+
+
+Take the average and standard deviation of 7G8 AB's (DAY 29)
+```{r}
+# Returns value mean (of 7G8 -- Day29), as a column
+mean_7G8_D1 <- rowMeans(df_7G8_D1[,col_7G8_D1], na.rm = TRUE)
+
+# Calculate stddevs using apply()
+std_df_7G8_D1 <- apply(df_7G8_D1[,col_7G8_D1], 1, sd, na.rm = TRUE)
+
+# Calculate median for using apply()
+median_df_7G8_D29 <- apply(df_7G8_D1[,col_7G8_D1], 1, median, na.rm = TRUE)
+```
+
+```{r}
+# Appends mean values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$row_means <- mean_7G8_D29
+
+# Appends mean values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$row_median <- median_df_7G8_D29
+
+# Appends std_dev values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$SD <- std_df_7G8_D29
+
+```
+
+Find the serorecognition threshold
+```{r}
+df_7G8_D1_meanstdevthresh <- df_7G8_D1 %>% 
+    mutate("row_means" = mean_7G8_D1) %>% mutate("SD" = std_df_7G8_D1) %>%
+  mutate("2.5stdev" = 2.5*SD) %>% mutate("threshold" = row_means + 2.5*SD)
+```
+
+
+Boxplot by position, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_7G8_D1_box <- melt(df_7G8_D1[,c(4, 5:ncol(df_7G8_D1))], id.vars = "Adjusted.Position")
+plot7G8_D1_BP <- ggplot(df_7G8_D1_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot(color="blue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8_Day1")
+plot7G8_D1_BP
+```
+
+Both 7G8_Day29 and Day 1, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_7G8_D1_box <- melt(df_7G8_D1[,c(4, 5:ncol(df_7G8_D1))], id.vars = "Adjusted.Position")
+COMBOplot7G8_BP <- ggplot(df_7G8_D1_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot(color="blue", alpha=0.5) + 
+  geom_boxplot(data = df_7G8_D29_box, color="red", alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("7G8")
+COMBOplot7G8_BP
+```
+
+Boxplot by position, no label - RAW
+```{r} 
+ggarrange(plot7G8_D29_BP, plot7G8_D1_BP, COMBOplot7G8_BP,
+         # labels = c("7G8_Day29", "7G8_Day1"),
+          ncol = 1, nrow = 3)
+```
+
+###### NF54 #######
+Take the average and standard deviation of NF54 AB's (DAY 29)
+```{r}
+# Returns value mean (of 7G8 -- Day29), as a column
+mean_NF54_D29 <- rowMeans(df_NF54_D29[,col_NF54_D29], na.rm = TRUE)
+
+# Calculate stddevs using apply()
+std_df_NF54_D29 <- apply(df_NF54_D29[,col_NF54_D29], 1, sd, na.rm = TRUE)
+
+# Calculate median for using apply()
+median_df_NF54_D29 <- apply(df_NF54_D29[,col_NF54_D29], 1, median, na.rm = TRUE)
+```
+
+```{r}
+# Appends mean values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$row_means <- mean_7G8_D29
+
+# Appends mean values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$row_median <- median_df_7G8_D29
+
+# Appends std_dev values as last (right-most) column to 'df_7G8_D29' data frame  
+#df_7G8_D29$SD <- std_df_7G8_D29
+
+```
+
+Find the serorecognition threshold
+```{r}
+df_NF54_D29_meanstdevthresh <- df_NF54_D29 %>% 
+    mutate("row_means" = mean_NF54_D29) %>% mutate("SD" = std_df_NF54_D29) %>%
+  mutate("2.5stdev" = 2.5*SD) %>% mutate("threshold" = row_means + 2.5*SD)
+```
+
+
+Boxplot by position, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_NF54_D29_box <- melt(df_NF54_D29[,c(4, 5:ncol(df_NF54_D29))], id.vars = "Adjusted.Position")
+plotNF54_D29_BP <- ggplot(df_NF54_D29_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot(color="coral3") + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("NF54_Day29")
+plotNF54_D29_BP
+```
+
+Boxplot by position, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_NF54_D1_box <- melt(df_NF54_D1[,c(4, 5:ncol(df_NF54_D1))], id.vars = "Adjusted.Position")
+plotNF54_D1_BP <- ggplot(df_NF54_D1_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot(color="slateblue") + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("NF54_Day1")
+plotNF54_D1_BP
+```
+
+Both NF54_Day29 and Day 1, no label
+```{r} 
+# Per 'Adjusted.Position'
+df_NF54_D1_box <- melt(df_NF54_D1[,c(4, 5:ncol(df_NF54_D1))], id.vars = "Adjusted.Position")
+COMBOplotNF54_BP <- ggplot(df_NF54_D1_box, aes(group = Adjusted.Position, y = value)) + 
+  geom_boxplot(color="slateblue", alpha=0.5) + 
+  geom_boxplot(data = df_NF54_D29_box, color="coral3", alpha=0.5) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
+  ggtitle("NF54")
+COMBOplotNF54_BP
+```
+
+Boxplot by position, no label - RAW
+```{r} 
+ggarrange(plotNF54_D29_BP, plotNF54_D1_BP, COMBOplotNF54_BP,
+         # labels = c("7G8_Day29", "7G8_Day1"),
+          ncol = 1, nrow = 3)
+```
+
+Boxplot by position, no label - RAW
+```{r} 
+ggarrange(plotNF54_D29_BP, plot7G8_D29_BP, 
+          plotNF54_D1_BP, plot7G8_D1_BP, 
+          COMBOplotNF54_BP, COMBOplot7G8_BP,
+         # labels = c("7G8_Day29", "7G8_Day1"),
+          ncol = 2, nrow = 3)
+```
