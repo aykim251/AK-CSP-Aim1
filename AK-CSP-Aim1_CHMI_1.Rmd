@@ -159,11 +159,13 @@ plot7G8_D29_BP
 MEDIAN Lineplot by position, no label
 ```{r} 
 # Per 'Adjusted.Position'
-df_7G8_D29_box <- melt(df_7G8_D29[,c(4, which(colnames(df_7G8_D29)==TestMedian_df_7G8_D29))], id.vars = "Adjusted.Position")
+df_7G8_D29_melt <- melt(df_7G8_D29[,c(4, 5:ncol(df_7G8_D29))], id.vars = "Adjusted.Position")
+df_7G8_D29_median <- melt(df_7G8_D29[,c(4, which(colnames(df_7G8_D29)==TestMedian_df_7G8_D29))], id.vars = "Adjusted.Position")
 
 
-plot7G8_D29_BP <- ggplot(df_7G8_D29_box, aes(x = Adjusted.Position, y = value)) + 
-  geom_line(color="red") + 
+plot7G8_D29_BP <- ggplot(df_7G8_D29_melt, aes(x = Adjusted.Position, y = value, group = variable)) + 
+  geom_line(color="red", alpha = 0.1) + 
+  geom_line(data = df_7G8_D29_median, color="red") + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 5)) +
   ggtitle("7G8_Day29")
 plot7G8_D29_BP
